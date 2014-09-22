@@ -1,0 +1,95 @@
+import sys
+import os
+import time
+import json
+from time import gmtime, strftime
+import gspread
+from datetime import datetime
+
+import simple_salesforce
+from simple_salesforce import Salesforce
+
+
+
+# This function searches SFDC for Contact Email
+def get_sfdc_record(email):
+    sf = Salesforce(username='', password='', security_token='')
+    data = sf.query('SELECT AccountId, Email FROM Contact WHERE Email = \'%s\'' % (email))
+    print str(len(data))
+    if len(data) > 0 and len(data['records']) > 0:
+        return(data['records'][0])
+    else:
+        return(None)
+
+def string_converter(x):
+    if x == 'yes':
+        str.replace(x, 'yes', 'true')
+    else:
+        str.replace(x, 'no', 'false')     
+
+
+gc = gspread.login('', '')
+sheet = gc.open('')
+worksheet = sheet.worksheet('')
+
+
+# get all of the records (the first 277 didn't have the client email)
+print 'Max ' + str(worksheet.row_count)
+
+for i in range(1, worksheet.row_count):
+    v = worksheet.row_values(i)
+
+    if len(v) < 14:
+        continue
+
+    if len(v) == 0:
+        exit(0)
+
+    email = v[2].lower()
+    
+    record = get_sfdc_record(email)
+    if record == None:
+        print 'No contact for ' + email
+        continue
+
+    print '**** Got contact for ' + email
+    
+    endpointtype = v[3] 
+    endpointnumber = v[4] 
+    locations = v[6]
+    macs = v[7]
+    mobile = v[10]
+    webconferencing = v[11]
+    proxy = v[30]
+    proxy_type = v[13]
+    webcams = v[14]
+    email_client = v[15]
+    email_integration = v[29]
+    sso = v[27]
+    sso_provider = v[18]
+    number_of_hosts = v[19]
+    deployed_date = v[20]
+    lms = v[21]
+    beta = v[31].lower()
+    audio_conferencing = v[23]
+    salesforce = v[32]
+    logo = v[28]
+    SF_DATE = datetime.strptime(deployed_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+                
+    string_converter(sso)
+
+    payload = {'End_Points_Targeted__c':endpointtype,'No_of_Room_Systems__c':endpointnumber,'Percentage_of_Mac_Users__c':macs,
+    'mobile__c':mobile,'Web_Conferencing_Vendors__c':webconferencing, 'Proxy_Vendor__c':proxy_type, 'Email_Provider__c':email_client, 
+    'SSO_Used__c':sso, 'SSO_provider__c':sso_provider, 'Planned_User_Deployment__c':number_of_hosts, 'Locations_accessing_Blue_Jeans__c':locations,
+    'LMS_System__c':lms, 'Audio_Conferencing_Vendors__c': audio_conferencing, 'Deployment_Completion_Date__c':SF_DATE,'Employees_with_Webcams__c':webcams}
+                
+    print 'AccountId -->' + record['AccountId']
+    print payload
+            
+    sf = Salesforce(username='', password='', security_token='')
+    sf.Account.update(record['AccountId'],payload)
+                
+
+    #print v
+
+#print gc, sheet, worksheet
